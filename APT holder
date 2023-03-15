@@ -1,0 +1,50 @@
+WITH t2 AS(
+    Select wallet_address AS "钱包地址"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now()) AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END as decimal(38,2))) AS "当天"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now() - interval '1 days') AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END AS decimal(38,2))) AS "前1天"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now() - interval '7 days') AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END AS decimal(38,2))) AS "前7天"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now() - interval '14 days') AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END AS decimal(38,2))) AS "前14天"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now() - interval '30 days') AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END AS decimal(38,2))) AS "前30天"
+        ,SUM(cast(CASE WHEN date_trunc('day', day) = date_trunc('day', now() - interval '90 days') AND amount_raw/1e18 IS NOT NULL THEN amount_raw/1e18 ELSE 0 END AS decimal(38,2))) AS "前90天"
+    FROM erc20."view_token_balances_daily"
+    WHERE token_address = '\0x4200000000000000000000000000000000000042'
+    AND date_trunc('day', day) in (date_trunc('day', now())
+        , date_trunc('day', now()) - interval '1 days'
+        , date_trunc('day', now()) - interval '7 days'
+        , date_trunc('day', now()) - interval '14 days'
+        , date_trunc('day', now()) - interval '30 days'
+        , date_trunc('day', now()) - interval '90 days')
+    GROUP BY 1)
+    
+Select row_number()over(ORDER BY ABS("当天"-"前1天") DESC) AS "当天持币变动排名"
+    ,"钱包地址"
+    ,row_number()over(ORDER BY "当天" DESC) AS "当天持币排名"
+    ,"当天"
+    
+    ,"前1天"
+    ,"当天"-"前1天" AS "当天-前1天"
+    ,cast(("当天"-"前1天")/(CASE WHEN "前1天" <> 0 THEN "前1天" ELSE 1 END)*100 AS DECIMAL(38,2)) || '%' AS "(当天-前1天)/前1天"
+    
+    ,row_number()over(ORDER BY ABS("当天"-"前7天") DESC) AS "前7天持币变动排名"
+    ,row_number()over(ORDER BY "前7天" DESC) AS "前7天持币排名"
+    ,"前7天"
+    ,"当天" - "前7天" AS "当天-前7天" 
+    ,cast(("当天" - "前7天")/(CASE WHEN "前7天" <> 0 THEN "前7天" ELSE 1 END)*100 AS DECIMAL(38,2)) || '%' AS "(当天-前7天)/前7天"
+    
+    ,row_number()over(ORDER BY "前14天" DESC) AS "前14天持币排名"
+    ,"前14天"
+    ,"当天" - "前14天" AS "当天-前14天"
+    ,cast(("当天" - "前14天")/(CASE WHEN "前14天" <> 0 THEN "前14天" ELSE 1 END)*100 AS DECIMAL(38,2)) || '%' AS "(当天-前14天)/前14天"
+    
+    ,row_number()over(ORDER BY "前30天" DESC) AS "前30天持币排名"
+    ,"前30天"
+    ,"当天" - "前30天" AS "当天-前30天"
+    ,cast(("当天" - "前30天")/(CASE WHEN "前30天" <> 0 THEN "前30天" ELSE 1 END)*100 AS DECIMAL(38,2)) || '%' AS "(当天-前30天)/前30天"
+    
+    ,row_number()over(ORDER BY "前90天" DESC) AS "前90天持币排名"
+    ,"前90天"
+    ,"当天" - "前90天" AS "当天-前90天"
+    ,cast(("当天" - "前90天")/(CASE WHEN "前90天" <> 0 THEN "前90天" ELSE 1 END)*100 AS DECIMAL(38,2)) || '%' AS "(当天-前90天)/前90天"
+FROM t2
+ORDER BY "当天持币排名"
+LIMIT 20000
